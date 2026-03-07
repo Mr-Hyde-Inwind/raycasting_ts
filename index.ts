@@ -155,10 +155,8 @@ function hittingCell(p1: Vector, p2: Vector) {
 function sceneSize(scene: Scene): Vector {
     const height: number = scene.length;
     let max_width: number = 0;
-    for (let i = 0; i < height; ++i) {
-        if (scene[i].length > max_width) {
-            max_width = scene[i].length;
-        }
+    for (const row of scene) {
+        max_width = Math.max(max_width, row.length);
     }
     return new Vector(max_width, height);
 }
@@ -197,10 +195,10 @@ function renderMinimap(ctx: CanvasRenderingContext2D, scene: Scene, player: Play
         strokeLine(ctx, new Vector(0, y), new Vector(scene_size.x, y));
     }
 
-    for (let y = 0; y < scene_size.y; ++y) {
-        for (let x = 0; x < scene_size.x; ++x) {
-            if (scene[y][x] !== null) {
-                ctx.fillStyle = scene[y][x];
+    for (const [y, row] of scene.entries()) {
+        for (const [x, color] of row.entries()) {
+            if (color !== null)  {
+                ctx.fillStyle = color;
                 ctx.fillRect(x, y, 1, 1);
             }
         }
@@ -231,7 +229,9 @@ function castRay(scene: Scene, p1: Vector, p2: Vector) {
     const start = p1;
     while (start.distanceTo(p1) <= FAR_CLIPPING_PLANE) {
         const c = hittingCell(p1, p2);
-        if (insideScene(scene, c) && scene[c.y][c.x] !== null) {
+        // ?. will return `undefined` when scene[c.y] not exists.
+        // So, use "!=" instead of "!==" to check null value.
+        if (insideScene(scene, c) && scene[c.y]?.[c.x] != null) {
             break;
         }
         const p3 = rayStep(p1, p2);
@@ -260,12 +260,13 @@ function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, player: Player
     for (let x = 0; x <= SCREEN_WIDTH; ++x) {
         const p = castRay(scene, player.position, r1.lerp(r2, x/SCREEN_WIDTH));
         const cell = hittingCell(player.position, p);
-        if (insideScene(scene, cell) && scene[cell.y][cell.x] !== null) {
+        const color: string|null|undefined = scene[cell.y]?.[cell.x];
+        if (insideScene(scene, cell) && color != null) {
             const v = p.sub(player.position);
             const d = player.direction.norm();
             // TODO: need to figure out why use focal_length
             const strip_height = focal_length / v.dot(d);
-            ctx.fillStyle = scene[cell.y][cell.x];
+            ctx.fillStyle = color;
             ctx.fillRect(x*strip_width, (ctx.canvas.height - strip_height)*0.5,
                          strip_width, strip_height);
         }
