@@ -327,50 +327,88 @@ function renderGame(ctx: CanvasRenderingContext2D, scene: Scene, player: Player)
     renderMinimap(ctx, scene, player, 0.33);
 }
 
-function draw(ctx: CanvasRenderingContext2D) {
-    const scene: Scene = [
-        [null,  null,  Color.red(), Color.blue(), null, null, null, null, null],
-        [null,  null,   null,  Color.cyan(), null, null, null, null, null],
-        [null, Color.green(), Color.blue(), Color.magenta(), null, null, null, null, null],
-        [null,  null,   null,   null,  null, null, null, null, null],
-        [null,  null,   null,   null,  null, null, null, null, null],
-        [null,  null,   null,   null,  null, null, null, null, null],
-        [null,  null,   null,   null,  null, null, null, null, null],
-    ];
+const scene: Scene = [
+    [null,  null,  Color.red(), Color.blue(), null, null, null, null, null],
+    [null,  null,   null,  Color.cyan(), null, null, null, null, null],
+    [null, Color.green(), Color.blue(), Color.magenta(), null, null, null, null, null],
+    [null,  null,   null,   null,  null, null, null, null, null],
+    [null,  null,   null,   null,  null, null, null, null, null],
+    [null,  null,   null,   null,  null, null, null, null, null],
+    [null,  null,   null,   null,  null, null, null, null, null],
+];
+
+
+let moving_forward: boolean = false;
+let moving_backward: boolean = false;
+let moving_right: boolean = false;
+let moving_left: boolean = false;
+
+function init(): [Player, Scene] {
+    window.addEventListener("keydown", (event) => {
+        if (!event.repeat) {
+            switch(event.code) {
+                case "KeyW": moving_forward = true; break;
+                case "KeyS": moving_backward = true; break;
+                case "KeyA": moving_left = true; break;
+                case "KeyD": moving_right = true; break;
+            }
+        }
+    });
+
+    window.addEventListener("keyup", (event) => {
+        if (!event.repeat) {
+            switch(event.code) {
+                case "KeyW": moving_forward = false; break;
+                case "KeyS": moving_backward = false; break;
+                case "KeyA": moving_left = false; break;
+                case "KeyD": moving_right = false; break;
+            }
+        }
+    });
 
     const scene_size = sceneSize(scene);
     const pos: Vector = new Vector(scene_size.x * 0.5, scene_size.y * 0.7);
     const direction: Vector = Vector.fromRadius(1, Math.PI / -2.0);
     const player = new Player(pos, direction);
+    return [player, scene];
+}
 
-    window.addEventListener("keydown", (event) => {
-        if (!event.repeat) {
-            switch(event.code) {
-                case "KeyD": {
-                    player.direction = player.direction.rotate(Math.PI*0.05);
-                    renderGame(ctx, scene, player);
-                    break;
-                }
-                case "KeyA": {
-                    player.direction = player.direction.rotate(-1 * Math.PI*0.05);
-                    renderGame(ctx, scene, player);
-                    break;
-                }
-                case "KeyW": {
-                    player.position = player.position.add(player.direction.norm().scale(0.5));
-                    renderGame(ctx, scene, player);
-                    break;
-                }
-                case "KeyS": {
-                    player.position = player.position.sub(player.direction.norm().scale(0.5));
-                    renderGame(ctx, scene, player);
-                    break;
-                }
-            }
+let start: number | undefined = undefined;
+let previousTimestamp: number | undefined = undefined;
+
+function renderFrame(ctx: CanvasRenderingContext2D, player: Player, scene: Scene) {
+    const step = (timestamp: number) => {
+        if (start === undefined) {
+            start = timestamp;
         }
-    });
+        if (previousTimestamp === undefined) {
+            previousTimestamp = start;
+        }
+        const delta_time: number = (timestamp - previousTimestamp) / 1000;
+        previousTimestamp = timestamp;
 
-    renderGame(ctx, scene, player);
+        let velocity: number = 0;
+        if (moving_forward) {
+            velocity += 2*delta_time;
+        }
+        if (moving_backward) {
+            velocity -= 2*delta_time;
+        }
+
+        let angular_velocity: number = 0;
+        if (moving_left) {
+            angular_velocity -= Math.PI * 0.5 * delta_time;
+        }
+        if (moving_right) {
+            angular_velocity += Math.PI * 0.5 * delta_time;
+        }
+
+        player.direction = player.direction.rotate(angular_velocity);
+        player.position = player.position.add(player.direction.scale(velocity));
+        renderGame(ctx, scene, player);
+        window.requestAnimationFrame(step);
+    }
+    window.requestAnimationFrame(step);
 }
 
 (() => {
@@ -388,5 +426,7 @@ function draw(ctx: CanvasRenderingContext2D) {
         throw new Error("2D context is not supported.");
     }
 
-    draw(ctx);
+    // draw(ctx);
+    let [player, scene] = init();
+    renderFrame(ctx, player, scene);
 })()
