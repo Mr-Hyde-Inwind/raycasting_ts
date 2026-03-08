@@ -1,10 +1,53 @@
 const EPS: number = 1e-6;
-const DIS_TO_PANEL: number = 1.0;
+const DIS_TO_PANEL: number = 0.1;
 const FAR_CLIPPING_PLANE: number = 10.0;
 const FOV: number = Math.PI * 0.5;
 const SCREEN_WIDTH = 300;
 
-type Scene = Array<Array<string|null>>;
+class Color {
+    r: number;
+    g: number;
+    b: number;
+    a: number;
+
+    static red(): Color {
+        return new Color(1, 0, 0, 1);
+    }
+
+    static green(): Color {
+        return new Color(0, 1, 0, 1);
+    }
+
+    static blue(): Color {
+        return new Color(0, 0, 1, 1);
+    }
+
+    static cyan(): Color {
+        return new Color(0, 1, 1, 1);
+    }
+
+    static magenta(): Color {
+        return new Color(1, 0, 1, 1);
+    }
+
+    constructor(r: number, g: number, b: number, a: number) {
+        this.r = r;
+        this.g = g;
+        this.b = b;
+        this.a = a;
+    }
+
+    brightness(factor: number): Color {
+        return new Color(this.r*factor, this.g*factor, this.b*factor, this.a);
+    }
+
+    fillStyle(): string {
+        return `rgba(${Math.floor(this.r*255)},`
+              + `${Math.floor(this.g*255)},`
+              + `${Math.floor(this.b*255)},`
+              + `${Math.floor(this.a)})`;
+    }
+}
 
 class Vector {
     x: number;
@@ -87,6 +130,8 @@ class Player {
         return [p1, p2];
     }
 }
+
+type Scene = Array<Array<Color|null>>;
 
 function snap(x: number, dx: number): number {
     if (dx > 0)
@@ -198,7 +243,7 @@ function renderMinimap(ctx: CanvasRenderingContext2D, scene: Scene, player: Play
     for (const [y, row] of scene.entries()) {
         for (const [x, color] of row.entries()) {
             if (color !== null)  {
-                ctx.fillStyle = color;
+                ctx.fillStyle = color.fillStyle();
                 ctx.fillRect(x, y, 1, 1);
             }
         }
@@ -260,13 +305,14 @@ function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, player: Player
     for (let x = 0; x <= SCREEN_WIDTH; ++x) {
         const p = castRay(scene, player.position, r1.lerp(r2, x/SCREEN_WIDTH));
         const cell = hittingCell(player.position, p);
-        const color: string|null|undefined = scene[cell.y]?.[cell.x];
+        const color: Color|null|undefined = scene[cell.y]?.[cell.x];
         if (insideScene(scene, cell) && color != null) {
             const v = p.sub(player.position);
             const d = player.direction.norm();
+            const wall_perpen_dist = v.dot(d);
             // TODO: need to figure out why use focal_length
-            const strip_height = focal_length / v.dot(d);
-            ctx.fillStyle = color;
+            const strip_height = focal_length / wall_perpen_dist;
+            ctx.fillStyle = color.brightness(1/wall_perpen_dist).fillStyle();
             ctx.fillRect(x*strip_width, (ctx.canvas.height - strip_height)*0.5,
                          strip_width, strip_height);
         }
@@ -283,9 +329,9 @@ function renderGame(ctx: CanvasRenderingContext2D, scene: Scene, player: Player)
 
 function draw(ctx: CanvasRenderingContext2D) {
     const scene: Scene = [
-        [null,  null,  "red", "blue", null, null, null, null, null],
-        [null,  null,   null,  "cyan", null, null, null, null, null],
-        [null, "green", "blue", "magenta", null, null, null, null, null],
+        [null,  null,  Color.red(), Color.blue(), null, null, null, null, null],
+        [null,  null,   null,  Color.cyan(), null, null, null, null, null],
+        [null, Color.green(), Color.blue(), Color.magenta(), null, null, null, null, null],
         [null,  null,   null,   null,  null, null, null, null, null],
         [null,  null,   null,   null,  null, null, null, null, null],
         [null,  null,   null,   null,  null, null, null, null, null],
