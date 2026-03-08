@@ -3,6 +3,8 @@ const DIS_TO_PANEL: number = 0.1;
 const FAR_CLIPPING_PLANE: number = 10.0;
 const FOV: number = Math.PI * 0.5;
 const SCREEN_WIDTH = 300;
+const PLAYER_ANGULAR_SPEED = Math.PI * 0.33;
+const PLAYER_SPEED = 1.0;
 
 class Color {
     r: number;
@@ -389,18 +391,18 @@ function renderFrame(ctx: CanvasRenderingContext2D, player: Player, scene: Scene
 
         let velocity: number = 0;
         if (moving_forward) {
-            velocity += 2*delta_time;
+            velocity += PLAYER_SPEED * delta_time;
         }
         if (moving_backward) {
-            velocity -= 2*delta_time;
+            velocity -= PLAYER_SPEED * delta_time;
         }
 
         let angular_velocity: number = 0;
         if (moving_left) {
-            angular_velocity -= Math.PI * 0.5 * delta_time;
+            angular_velocity -= PLAYER_ANGULAR_SPEED * delta_time;
         }
         if (moving_right) {
-            angular_velocity += Math.PI * 0.5 * delta_time;
+            angular_velocity += PLAYER_ANGULAR_SPEED * delta_time;
         }
 
         player.direction = player.direction.rotate(angular_velocity);
