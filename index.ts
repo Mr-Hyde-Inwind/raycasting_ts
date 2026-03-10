@@ -126,9 +126,9 @@ class Player {
     }
 
     fovRange():[Vector, Vector] {
-        const ray_len: number = DIS_TO_PANEL / Math.cos(FOV/2);
-        const p1: Vector = this.position.add(this.direction.rotate(-1 * FOV/2).scale(ray_len));
-        const p2: Vector = this.position.add(this.direction.rotate(FOV/2).scale(ray_len));
+        const ray_len: number = DIS_TO_PANEL * Math.tan(FOV/2);
+        const p1: Vector = this.direction.rotate(-1 * FOV/2).scale(ray_len);
+        const p2: Vector = this.direction.rotate(FOV/2).scale(ray_len);
         return [p1, p2];
     }
 }
@@ -193,12 +193,6 @@ function strokeLine(ctx: CanvasRenderingContext2D, p1: Vector, p2: Vector) {
     ctx.stroke();
 }
 
-function hittingCell(p1: Vector, p2: Vector) {
-    const direct_norm: Vector = p2.sub(p1).norm();
-    return new Vector(Math.floor(p2.x + Math.sign(direct_norm.x)*EPS),
-                      Math.floor(p2.y + Math.sign(direct_norm.y)*EPS));
-}
-
 function sceneSize(scene: Scene): Vector {
     const height: number = scene.length;
     let max_width: number = 0;
@@ -257,7 +251,9 @@ function renderMinimap(ctx: CanvasRenderingContext2D, scene: Scene, player: Play
     ctx.strokeStyle = "magenta";
     fillCircle(ctx, player.position, 0.1);
 
-    const [p1, p2] = player.fovRange();
+    const [r1, r2] = player.fovRange();
+    const p1 = r1.add(player.position) 
+    const p2 = r2.add(player.position) 
     strokeLine(ctx, player.position, p1);
     strokeLine(ctx, player.position, p2);
     strokeLine(ctx, p1, p2);
@@ -272,6 +268,12 @@ function insideScene(scene: Scene, p: Vector): boolean {
         return false;
     }
     return true;
+}
+
+function hittingCell(p1: Vector, p2: Vector) {
+    const direct_norm: Vector = p2.sub(p1).norm();
+    return new Vector(Math.floor(p2.x + Math.sign(direct_norm.x)*EPS),
+                      Math.floor(p2.y + Math.sign(direct_norm.y)*EPS));
 }
 
 function castRay(scene: Scene, p1: Vector, p2: Vector) {
@@ -307,7 +309,7 @@ function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, player: Player
     const focal_length = (ctx.canvas.width / 2) / Math.tan(FOV / 2);
     const [r1, r2] = player.fovRange();
     for (let x = 0; x <= SCREEN_WIDTH; ++x) {
-        const p = castRay(scene, player.position, r1.lerp(r2, x/SCREEN_WIDTH));
+        const p = castRay(scene, player.position, player.position.add(r1.lerp(r2, x/SCREEN_WIDTH)));
         const cell_pos = hittingCell(player.position, p);
         const cell: Color|HTMLImageElement|null|undefined = scene[cell_pos.y]?.[cell_pos.x];
         if (insideScene(scene, cell_pos) && cell != null) {
