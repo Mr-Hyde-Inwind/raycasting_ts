@@ -242,7 +242,9 @@ function renderMinimap(ctx: CanvasRenderingContext2D, scene: Scene, player: Play
                 ctx.fillStyle = cell.fillStyle();
                 ctx.fillRect(x, y, 1, 1);
             } else if (cell instanceof HTMLImageElement) {
-                throw new Error("Not implemented");
+                ctx.drawImage(cell,
+                             0, 0, cell.width, cell.height,
+                             x, y, 1, 1);
             }
         }
     }
@@ -323,7 +325,22 @@ function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, player: Player
                 ctx.fillRect(x*strip_width, (ctx.canvas.height - strip_height)*0.5,
                              strip_width, strip_height);
             } else if (cell instanceof HTMLImageElement) {
-                throw new Error("Not implemented.");
+                const t: Vector = p.sub(cell_pos);
+                let tx: number = 0;
+                if (Math.abs(t.x - 1) <= EPS) {
+                    tx = 1 - t.y;
+                } else if (Math.abs(t.y) <= EPS){
+                    tx = 1 - t.x;
+                } else {
+                    tx = Math.abs(t.x) <= EPS ? t.y : t.x;
+                }
+
+                ctx.save();
+                ctx.filter = `brightness(${Math.min(1/wall_perpen_dist, 0.75)})`;
+                ctx.drawImage(cell,
+                              tx*cell.width, 0, Math.ceil(cell.width/SCREEN_WIDTH), cell.height,
+                              x*strip_width, (ctx.canvas.height - strip_height) * 0.5, strip_width, strip_height);
+                ctx.restore();
             }
         }
     } ctx.restore();
@@ -336,23 +353,12 @@ function renderGame(ctx: CanvasRenderingContext2D, scene: Scene, player: Player)
     renderMinimap(ctx, scene, player, 0.33);
 }
 
-const scene: Scene = [
-    [null,  null,  Color.red(), Color.blue(), null, null, null, null, null],
-    [null,  null,   null,  Color.cyan(), null, null, null, null, null],
-    [null, Color.green(), Color.blue(), Color.magenta(), null, null, null, null, null],
-    [null,  null,   null,   null,  null, null, null, null, null],
-    [null,  null,   null,   null,  null, null, null, null, null],
-    [null,  null,   null,   null,  null, null, null, null, null],
-    [null,  null,   null,   null,  null, null, null, null, null],
-];
-
-
 let moving_forward: boolean = false;
 let moving_backward: boolean = false;
 let moving_right: boolean = false;
 let moving_left: boolean = false;
 
-function init(): [Player, Scene] {
+async function init(): Promise<[Player, Scene]> {
     window.addEventListener("keydown", (event) => {
         if (!event.repeat) {
             switch(event.code) {
@@ -375,11 +381,26 @@ function init(): [Player, Scene] {
         }
     });
 
+    const yellow_jpg: HTMLImageElement = await loadImage("assets/yellow.jpg");
+    const wall: HTMLImageElement = await loadImage("assets/DSC_1025_0.jpg")
+
+    const scene: Scene = [
+        [null,  null,  wall, wall, null, null, null, null, null],
+        [null,  null,   null,  wall, null, null, null, null, null],
+        [null, wall, wall, wall, null, null, null, null, null],
+        [null,  null,   null,   null,  null, null, null, null, null],
+        [null,  null,   null,   null,  null, null, null, null, null],
+        [null,  null,   wall,   null,  null, null, null, null, null],
+        [null,  null,   null,   null,  null, null, null, null, null],
+    ];
+
     const scene_size = sceneSize(scene);
     const pos: Vector = new Vector(scene_size.x * 0.5, scene_size.y * 0.7);
     const direction: Vector = Vector.fromRadius(1, Math.PI / -2.0);
     const player = new Player(pos, direction);
-    return [player, scene];
+    return new Promise<[Player, Scene]>((resolve, reject) => {
+        resolve([player, scene])
+    });
 }
 
 let start: number | undefined = undefined;
@@ -429,7 +450,7 @@ async function loadImage(url: string): Promise<HTMLImageElement> {
     });
 }
 
-(() => {
+(async () => {
     const game = document.getElementById("game") as (HTMLCanvasElement | null);
 
     if (game === null) {
@@ -445,6 +466,6 @@ async function loadImage(url: string): Promise<HTMLImageElement> {
     }
 
     // draw(ctx);
-    let [player, scene] = init();
+    let [player, scene] = await init();
     renderFrame(ctx, player, scene);
 })()
