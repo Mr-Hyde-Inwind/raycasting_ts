@@ -206,6 +206,8 @@ function drawCanvas(ctx: CanvasRenderingContext2D) {
     ctx.save();
     ctx.fillStyle = "#181818";
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.fillStyle = "#303030";
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height * 0.5);
     ctx.restore();
 }
 
@@ -222,7 +224,7 @@ function renderMinimap(ctx: CanvasRenderingContext2D, scene: Scene, player: Play
     const factor_x: number = ctx.canvas.width / scene_size.x * factor;
     const factor_y: number = ctx.canvas.height / scene_size.y * rectify * factor;
     ctx.scale(factor_x, factor_y);
-    ctx.lineWidth = 0.05;
+    ctx.lineWidth = 0.1;
     ctx.strokeStyle = "#505050";
 
     ctx.fillStyle = "#181818";
