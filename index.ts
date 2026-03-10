@@ -1,8 +1,10 @@
 const EPS: number = 1e-6;
-const DIS_TO_PANEL: number = 0.1;
+const NEAR_CLIPPING_PLANE: number = 0.1;
 const FAR_CLIPPING_PLANE: number = 10.0;
 const FOV: number = Math.PI * 0.5;
-const SCREEN_WIDTH = 300;
+const SCREEN_FACTOR = 45;
+const SCREEN_WIDTH = Math.floor(16*SCREEN_FACTOR);
+const SCREEEN_HEIGHT = Math.floor(9*SCREEN_FACTOR);
 const PLAYER_ANGULAR_SPEED = Math.PI * 0.5;
 const PLAYER_SPEED = 1.5;
 
@@ -126,7 +128,7 @@ class Player {
     }
 
     fovRange():[Vector, Vector] {
-        const ray_len: number = DIS_TO_PANEL * Math.tan(FOV/2);
+        const ray_len: number = NEAR_CLIPPING_PLANE * Math.tan(FOV/2);
         const p1: Vector = this.direction.rotate(-1 * FOV/2).scale(ray_len);
         const p2: Vector = this.direction.rotate(FOV/2).scale(ray_len);
         return [p1, p2];
@@ -220,7 +222,9 @@ function renderMinimap(ctx: CanvasRenderingContext2D, scene: Scene, player: Play
         throw new Error("x should not be 0.");
     }
 
-    const rectify: number = scene_size.y / scene_size.x;
+    // canvas.width / (canvas.height * x) = scene.width / scene.height
+    // x = canvas.width * scene.height / (canvas.height * scene.width)
+    const rectify: number = ctx.canvas.width * scene_size.y / ctx.canvas.height / scene_size.x
     const factor_x: number = ctx.canvas.width / scene_size.x * factor;
     const factor_y: number = ctx.canvas.height / scene_size.y * rectify * factor;
     ctx.scale(factor_x, factor_y);
@@ -309,8 +313,8 @@ function calculateWallDist(v1: Vector, v2: Vector): number {
 
 function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, player: Player) {
     ctx.save();
+    ctx.scale(ctx.canvas.width/SCREEN_WIDTH, ctx.canvas.height/SCREEEN_HEIGHT);
     const strip_width = Math.ceil(ctx.canvas.width/SCREEN_WIDTH);
-    const focal_length = (ctx.canvas.width / 2) / Math.tan(FOV / 2);
     const [r1, r2] = player.fovRange();
     for (let x = 0; x <= SCREEN_WIDTH; ++x) {
         const p = castRay(scene, player.position, player.position.add(r1.lerp(r2, x/SCREEN_WIDTH)));
@@ -321,7 +325,7 @@ function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, player: Player
             const d = player.direction.norm();
             const wall_perpen_dist = v.dot(d);
             // TODO: need to figure out why use focal_length
-            const strip_height = focal_length / wall_perpen_dist;
+            const strip_height = SCREEEN_HEIGHT / wall_perpen_dist;
             if (cell instanceof Color) {
                 ctx.fillStyle = cell.brightness(1/wall_perpen_dist).fillStyle();
                 ctx.fillRect(x*strip_width, (ctx.canvas.height - strip_height)*0.5,
@@ -341,18 +345,19 @@ function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, player: Player
                 ctx.filter = `brightness(${Math.min(1/wall_perpen_dist, 0.75)})`;
                 ctx.drawImage(cell,
                               tx*cell.width, 0, Math.ceil(cell.width/SCREEN_WIDTH), cell.height,
-                              x*strip_width, (ctx.canvas.height - strip_height) * 0.5, strip_width, strip_height);
+                              Math.floor(x), Math.floor((SCREEEN_HEIGHT - strip_height) * 0.5), 1, Math.ceil(strip_height));
                 ctx.restore();
             }
         }
-    } ctx.restore();
+    }
+    ctx.restore();
 }
 
 function renderGame(ctx: CanvasRenderingContext2D, scene: Scene, player: Player) {
     ctx.reset();
     drawCanvas(ctx);
     renderScene(ctx, scene, player);
-    renderMinimap(ctx, scene, player, 0.33);
+    renderMinimap(ctx, scene, player, 0.2);
 }
 
 let moving_forward: boolean = false;
@@ -459,8 +464,8 @@ async function loadImage(url: string): Promise<HTMLImageElement> {
         throw new Error("No canvas with id `game` is found.");
     }
 
-    game.width = 800;
-    game.height = 800;
+    game.width = 16 * 80;
+    game.height = 9 * 80;
 
     const ctx = game.getContext("2d");
     if (ctx === null) {
