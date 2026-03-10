@@ -133,7 +133,7 @@ class Player {
     }
 }
 
-type Scene = Array<Array<Color|null>>;
+type Scene = Array<Array<Color|null|HTMLImageElement>>;
 
 function snap(x: number, dx: number): number {
     if (dx > 0)
@@ -243,10 +243,12 @@ function renderMinimap(ctx: CanvasRenderingContext2D, scene: Scene, player: Play
     }
 
     for (const [y, row] of scene.entries()) {
-        for (const [x, color] of row.entries()) {
-            if (color !== null)  {
-                ctx.fillStyle = color.fillStyle();
+        for (const [x, cell] of row.entries()) {
+            if (cell instanceof Color)  {
+                ctx.fillStyle = cell.fillStyle();
                 ctx.fillRect(x, y, 1, 1);
+            } else if (cell instanceof HTMLImageElement) {
+                throw new Error("Not implemented");
             }
         }
     }
@@ -306,20 +308,23 @@ function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, player: Player
     const [r1, r2] = player.fovRange();
     for (let x = 0; x <= SCREEN_WIDTH; ++x) {
         const p = castRay(scene, player.position, r1.lerp(r2, x/SCREEN_WIDTH));
-        const cell = hittingCell(player.position, p);
-        const color: Color|null|undefined = scene[cell.y]?.[cell.x];
-        if (insideScene(scene, cell) && color != null) {
+        const cell_pos = hittingCell(player.position, p);
+        const cell: Color|HTMLImageElement|null|undefined = scene[cell_pos.y]?.[cell_pos.x];
+        if (insideScene(scene, cell_pos) && cell != null) {
             const v = p.sub(player.position);
             const d = player.direction.norm();
             const wall_perpen_dist = v.dot(d);
             // TODO: need to figure out why use focal_length
             const strip_height = focal_length / wall_perpen_dist;
-            ctx.fillStyle = color.brightness(1/wall_perpen_dist).fillStyle();
-            ctx.fillRect(x*strip_width, (ctx.canvas.height - strip_height)*0.5,
-                         strip_width, strip_height);
+            if (cell instanceof Color) {
+                ctx.fillStyle = cell.brightness(1/wall_perpen_dist).fillStyle();
+                ctx.fillRect(x*strip_width, (ctx.canvas.height - strip_height)*0.5,
+                             strip_width, strip_height);
+            } else if (cell instanceof HTMLImageElement) {
+                throw new Error("Not implemented.");
+            }
         }
-    }
-    ctx.restore();
+    } ctx.restore();
 }
 
 function renderGame(ctx: CanvasRenderingContext2D, scene: Scene, player: Player) {
@@ -411,6 +416,15 @@ function renderFrame(ctx: CanvasRenderingContext2D, player: Player, scene: Scene
         window.requestAnimationFrame(step);
     }
     window.requestAnimationFrame(step);
+}
+
+async function loadImage(url: string): Promise<HTMLImageElement> {
+    let image = new Image()
+    image.src = url
+    return new Promise((resolve, reject) => {
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+    });
 }
 
 (() => {
