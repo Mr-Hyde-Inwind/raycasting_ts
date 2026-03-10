@@ -3,8 +3,8 @@ const DIS_TO_PANEL: number = 0.1;
 const FAR_CLIPPING_PLANE: number = 10.0;
 const FOV: number = Math.PI * 0.5;
 const SCREEN_WIDTH = 300;
-const PLAYER_ANGULAR_SPEED = Math.PI * 0.33;
-const PLAYER_SPEED = 1.0;
+const PLAYER_ANGULAR_SPEED = Math.PI * 0.5;
+const PLAYER_SPEED = 1.5;
 
 class Color {
     r: number;
