@@ -325,7 +325,6 @@ function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, player: Player
             const v = p.sub(player.position);
             const d = player.direction.norm();
             const wall_perpen_dist = v.dot(d);
-            // TODO: need to figure out why use focal_length
             const strip_height = SCREEEN_HEIGHT / wall_perpen_dist;
             if (cell instanceof Color) {
                 ctx.fillStyle = cell.brightness(1/wall_perpen_dist).fillStyle();
@@ -367,7 +366,10 @@ let moving_right: boolean = false;
 let moving_left: boolean = false;
 
 async function init(): Promise<[Player, Scene]> {
-    window.addEventListener("keydown", (event) => {
+    const div = document.getElementById("game_container") as (HTMLDivElement | null);
+    if (div === null) throw new Error("No div element with id 'game_container' found.")
+
+    div.addEventListener("keydown", (event) => {
         if (!event.repeat) {
             switch(event.code) {
                 case "KeyW": moving_forward = true; break;
@@ -376,9 +378,10 @@ async function init(): Promise<[Player, Scene]> {
                 case "KeyD": moving_right = true; break;
             }
         }
+        event.stopPropagation();
     });
 
-    window.addEventListener("keyup", (event) => {
+    div.addEventListener("keyup", (event) => {
         if (!event.repeat) {
             switch(event.code) {
                 case "KeyW": moving_forward = false; break;
@@ -387,6 +390,7 @@ async function init(): Promise<[Player, Scene]> {
                 case "KeyD": moving_right = false; break;
             }
         }
+        event.stopPropagation();
     });
 
     const yellow_jpg: HTMLImageElement = await loadImage("assets/yellow.jpg");
