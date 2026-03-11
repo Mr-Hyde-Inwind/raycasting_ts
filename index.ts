@@ -127,6 +127,7 @@ class Player {
         this.direction = direct;
     }
 
+    // fovRange return two vector from player position to the two sides of NEAR_CLIPPING_PLANE
     fovRange():[Vector, Vector] {
         const ray_len: number = NEAR_CLIPPING_PLANE * Math.tan(FOV/2);
         const p1: Vector = this.direction.rotate(-1 * FOV/2).scale(ray_len);
