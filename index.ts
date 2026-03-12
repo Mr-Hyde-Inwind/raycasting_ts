@@ -311,6 +311,33 @@ function calculateWallDist(v1: Vector, v2: Vector): number {
     return sin_theta * v1.length();
 }
 
+function renderCeiling(ctx: CanvasRenderingContext2D, scene: Scene, player: Player) {
+    ctx.save();
+    const player_height: number = SCREEN_HEIGHT / 2;
+    const [r1, r2]: [Vector, Vector] = player.fovRange();
+    const ray_len: number = r1.length();
+    ctx.scale(ctx.canvas.width / SCREEN_WIDTH, ctx.canvas.height / SCREEN_HEIGHT);
+    for (let y = SCREEN_HEIGHT / 2; y > 0; y--) {
+        const z = y;
+        const actual_len = ray_len / (player_height - z) / NEAR_CLIPPING_PLANE * player_height;
+        const extended_r1: Vector = r1.norm().scale(actual_len)
+        const extended_r2: Vector = r2.norm().scale(actual_len)
+        for (let x = 0; x <= SCREEN_WIDTH; x++) {
+            const t: Vector = extended_r1.lerp(extended_r2, x/SCREEN_WIDTH).add(player.position);
+            const p: Vector = new Vector(Math.floor(t.x), Math.floor(t.y));
+            let color: Color|undefined = undefined;
+            if (Math.abs(p.x)%2 === Math.abs(p.y%2)) {
+                color = Color.blue();
+            } else {
+                color = Color.cyan();
+            }
+            ctx.fillStyle = color.brightness(1 - y/player_height).fillStyle();
+            ctx.fillRect(x, y, 1, 1);
+        }
+    }
+    ctx.restore();
+}
+
 function renderFloor(ctx: CanvasRenderingContext2D, scene: Scene, player: Player) {
     ctx.save();
     const player_height: number = SCREEN_HEIGHT / 2;
@@ -327,11 +354,11 @@ function renderFloor(ctx: CanvasRenderingContext2D, scene: Scene, player: Player
             const p: Vector = new Vector(Math.floor(t.x), Math.floor(t.y));
             let color: Color|undefined = undefined;
             if (Math.abs(p.x)%2 === Math.abs(p.y%2)) {
-                color = new Color(255, 0, 0, 1);
+                color = Color.green();
             } else {
-                color = new Color(0, 255, 0, 1);
+                color = Color.magenta();
             }
-            ctx.fillStyle = color.fillStyle();
+            ctx.fillStyle = color.brightness(1 - z/player_height).fillStyle();
             ctx.fillRect(x, y, 1, 1);
         }
     }
@@ -369,9 +396,11 @@ function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, player: Player
                     cell,
                     Math.floor(tx*cell.width), 0, 1, cell.height,
                     Math.floor(x), Math.floor((SCREEN_HEIGHT - strip_height) * 0.5),
-                    1, Math.ceil(strip_height));
+                    1, Math.ceil(strip_height * 1.01));
                 ctx.fillStyle = new Color(0, 0, 0, 1 - 1/wall_perpen_dist).fillStyle();
-                ctx.fillRect(Math.floor(x), Math.floor((SCREEN_HEIGHT - strip_height)*0.5), 1, Math.ceil(strip_height));
+                ctx.fillRect(
+                    Math.floor(x), Math.floor((SCREEN_HEIGHT - strip_height)*0.5),
+                    1, Math.ceil(strip_height * 1.01));
             }
         }
     }
@@ -382,6 +411,7 @@ function renderGame(ctx: CanvasRenderingContext2D, scene: Scene, player: Player)
     ctx.reset();
     drawCanvas(ctx);
     renderFloor(ctx, scene, player);
+    renderCeiling(ctx, scene, player);
     renderScene(ctx, scene, player);
     renderMinimap(ctx, scene, player, 0.2);
 }
