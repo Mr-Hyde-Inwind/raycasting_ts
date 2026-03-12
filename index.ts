@@ -2,9 +2,9 @@ const EPS: number = 1e-6;
 const NEAR_CLIPPING_PLANE: number = 0.1;
 const FAR_CLIPPING_PLANE: number = 10.0;
 const FOV: number = Math.PI * 0.5;
-const SCREEN_FACTOR = 45;
+const SCREEN_FACTOR = 20;
 const SCREEN_WIDTH = Math.floor(16*SCREEN_FACTOR);
-const SCREEEN_HEIGHT = Math.floor(9*SCREEN_FACTOR);
+const SCREEN_HEIGHT = Math.floor(9*SCREEN_FACTOR);
 const PLAYER_ANGULAR_SPEED = Math.PI * 0.5;
 const PLAYER_SPEED = 1.5;
 
@@ -49,7 +49,7 @@ class Color {
         return `rgba(${Math.floor(this.r*255)},`
               + `${Math.floor(this.g*255)},`
               + `${Math.floor(this.b*255)},`
-              + `${Math.floor(this.a)})`;
+              + `${this.a})`;
     }
 }
 
@@ -57,8 +57,8 @@ class Vector {
     x: number;
     y: number;
 
-    static fromRadius(length: number, rad: number): Vector {
-        return new Vector(length * Math.cos(rad), length * Math.sin(rad));
+    static fromRadius(rad: number): Vector {
+        return new Vector(Math.cos(rad), Math.sin(rad));
     }
 
     constructor(x: number, y: number) {
@@ -129,7 +129,7 @@ class Player {
 
     // fovRange return two vector from player position to the two sides of NEAR_CLIPPING_PLANE
     fovRange():[Vector, Vector] {
-        const ray_len: number = NEAR_CLIPPING_PLANE * Math.tan(FOV/2);
+        const ray_len: number = NEAR_CLIPPING_PLANE / Math.cos(FOV/2);
         const p1: Vector = this.direction.rotate(-1 * FOV/2).scale(ray_len);
         const p2: Vector = this.direction.rotate(FOV/2).scale(ray_len);
         return [p1, p2];
@@ -266,7 +266,6 @@ function renderMinimap(ctx: CanvasRenderingContext2D, scene: Scene, player: Play
     strokeLine(ctx, player.position, p1);
     strokeLine(ctx, player.position, p2);
     strokeLine(ctx, p1, p2);
-
     ctx.restore();
 }
 
@@ -314,39 +313,38 @@ function calculateWallDist(v1: Vector, v2: Vector): number {
 
 function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, player: Player) {
     ctx.save();
-    ctx.scale(ctx.canvas.width/SCREEN_WIDTH, ctx.canvas.height/SCREEEN_HEIGHT);
-    const strip_width = Math.ceil(ctx.canvas.width/SCREEN_WIDTH);
+    ctx.scale(ctx.canvas.width / SCREEN_WIDTH, ctx.canvas.height / SCREEN_HEIGHT);
     const [r1, r2] = player.fovRange();
-    for (let x = 0; x <= SCREEN_WIDTH; ++x) {
+    for (let x = 0; x < SCREEN_WIDTH; ++x) {
         const p = castRay(scene, player.position, player.position.add(r1.lerp(r2, x/SCREEN_WIDTH)));
         const cell_pos = hittingCell(player.position, p);
         const cell: Color|HTMLImageElement|null|undefined = scene[cell_pos.y]?.[cell_pos.x];
-        if (insideScene(scene, cell_pos) && cell != null) {
+        if (insideScene(scene, cell_pos)) {
             const v = p.sub(player.position);
-            const d = player.direction.norm();
+            const d = player.direction;
             const wall_perpen_dist = v.dot(d);
-            const strip_height = SCREEEN_HEIGHT / wall_perpen_dist;
+            const strip_height = SCREEN_HEIGHT / wall_perpen_dist;
             if (cell instanceof Color) {
                 ctx.fillStyle = cell.brightness(1/wall_perpen_dist).fillStyle();
-                ctx.fillRect(x*strip_width, (ctx.canvas.height - strip_height)*0.5,
-                             strip_width, strip_height);
+                ctx.fillRect(
+                    Math.floor(x), Math.floor((SCREEN_HEIGHT - strip_height)*0.5),
+                    1, Math.ceil(strip_height));
             } else if (cell instanceof HTMLImageElement) {
                 const t: Vector = p.sub(cell_pos);
                 let tx: number = 0;
-                if (Math.abs(t.x - 1) <= EPS) {
-                    tx = 1 - t.y;
-                } else if (Math.abs(t.y) <= EPS){
-                    tx = 1 - t.x;
+                if ((Math.abs(t.x) < EPS || Math.abs(t.x - 1) < EPS) && t.y > 0) {
+                    tx = t.y;
                 } else {
-                    tx = Math.abs(t.x) <= EPS ? t.y : t.x;
+                    tx = t.x;
                 }
 
-                ctx.save();
-                ctx.filter = `brightness(${Math.min(1/wall_perpen_dist, 0.75)})`;
-                ctx.drawImage(cell,
-                              tx*cell.width, 0, Math.ceil(cell.width/SCREEN_WIDTH), cell.height,
-                              Math.floor(x), Math.floor((SCREEEN_HEIGHT - strip_height) * 0.5), 1, Math.ceil(strip_height));
-                ctx.restore();
+                ctx.drawImage(
+                    cell,
+                    Math.floor(tx*cell.width), 0, 1, cell.height,
+                    Math.floor(x), Math.floor((SCREEN_HEIGHT - strip_height) * 0.5),
+                    1, Math.ceil(strip_height));
+                ctx.fillStyle = new Color(0, 0, 0, 1 - 1/wall_perpen_dist).fillStyle();
+                ctx.fillRect(Math.floor(x), Math.floor((SCREEN_HEIGHT - strip_height)*0.5), 1, Math.ceil(strip_height));
             }
         }
     }
@@ -408,7 +406,7 @@ async function init(): Promise<[Player, Scene]> {
 
     const scene_size = sceneSize(scene);
     const pos: Vector = new Vector(scene_size.x * 0.5, scene_size.y * 0.7);
-    const direction: Vector = Vector.fromRadius(1, Math.PI / -2.0);
+    const direction: Vector = Vector.fromRadius(Math.PI / -2.0);
     const player = new Player(pos, direction);
     return new Promise<[Player, Scene]>((resolve, reject) => {
         resolve([player, scene])
@@ -454,7 +452,7 @@ function renderFrame(ctx: CanvasRenderingContext2D, player: Player, scene: Scene
 }
 
 async function loadImage(url: string): Promise<HTMLImageElement> {
-    let image = new Image()
+    const image = new Image()
     image.src = url
     return new Promise((resolve, reject) => {
         image.onload = () => resolve(image);
