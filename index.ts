@@ -7,6 +7,9 @@ const SCREEN_WIDTH = Math.floor(16*SCREEN_FACTOR);
 const SCREEN_HEIGHT = Math.floor(9*SCREEN_FACTOR);
 const PLAYER_ANGULAR_SPEED = Math.PI * 0.5;
 const PLAYER_SPEED = 1.5;
+const PLAYER_SIZE = 0.5;
+
+type Scene = Array<Array<Color|null|HTMLImageElement>>;
 
 class Color {
     r: number;
@@ -113,6 +116,10 @@ class Vector {
         return new Vector(r*Math.cos(theta), r*Math.sin(theta));
     }
 
+    rot90(): Vector {
+        return new Vector(-this.y, this.x)
+    }
+
     lerp(that: Vector, factor: number): Vector {
         return this.add(that.sub(this).scale(factor));
     }
@@ -135,8 +142,6 @@ class Player {
         return [p1, p2];
     }
 }
-
-type Scene = Array<Array<Color|null|HTMLImageElement>>;
 
 function snap(x: number, dx: number): number {
     if (dx > 0)
@@ -258,14 +263,18 @@ function renderMinimap(ctx: CanvasRenderingContext2D, scene: Scene, player: Play
 
     ctx.fillStyle = "magenta";
     ctx.strokeStyle = "magenta";
-    fillCircle(ctx, player.position, 0.1);
 
-    const [r1, r2] = player.fovRange();
-    const p1 = r1.add(player.position) 
-    const p2 = r2.add(player.position) 
-    strokeLine(ctx, player.position, p1);
-    strokeLine(ctx, player.position, p2);
-    strokeLine(ctx, p1, p2);
+    ctx.beginPath()
+    const top = player.position.add(player.direction.scale(PLAYER_SIZE/2));
+    const tp = player.position.sub(player.direction.scale(PLAYER_SIZE/2));
+    const bottom_left = tp.add(player.direction.scale(PLAYER_SIZE/2).rot90());
+    const bottom_right = tp.sub(player.direction.scale(PLAYER_SIZE/2).rot90());
+
+    ctx.moveTo(top.x, top.y);
+    ctx.lineTo(bottom_left.x, bottom_left.y);
+    ctx.lineTo(bottom_right.x, bottom_right.y);
+    ctx.fill();
+
     ctx.restore();
 }
 
@@ -317,7 +326,7 @@ function renderCeiling(ctx: CanvasRenderingContext2D, scene: Scene, player: Play
     const [r1, r2]: [Vector, Vector] = player.fovRange();
     const ray_len: number = r1.length();
     ctx.scale(ctx.canvas.width / SCREEN_WIDTH, ctx.canvas.height / SCREEN_HEIGHT);
-    for (let y = SCREEN_HEIGHT / 2; y > 0; y--) {
+    for (let y = SCREEN_HEIGHT / 2 - 1; y >= 0; y--) {
         const z = y;
         const actual_len = ray_len / (player_height - z) / NEAR_CLIPPING_PLANE * player_height;
         const extended_r1: Vector = r1.norm().scale(actual_len)
@@ -326,10 +335,10 @@ function renderCeiling(ctx: CanvasRenderingContext2D, scene: Scene, player: Play
             const t: Vector = extended_r1.lerp(extended_r2, x/SCREEN_WIDTH).add(player.position);
             const p: Vector = new Vector(Math.floor(t.x), Math.floor(t.y));
             let color: Color|undefined = undefined;
-            if (Math.abs(p.x)%2 === Math.abs(p.y%2)) {
+            if ((Math.abs(p.x)+Math.abs(p.y))%2) {
                 color = Color.blue();
             } else {
-                color = Color.cyan();
+                color = Color.red();
             }
             ctx.fillStyle = color.brightness(1 - y/player_height).fillStyle();
             ctx.fillRect(x, y, 1, 1);
@@ -353,7 +362,7 @@ function renderFloor(ctx: CanvasRenderingContext2D, scene: Scene, player: Player
             const t: Vector = extended_r1.lerp(extended_r2, x/SCREEN_WIDTH).add(player.position);
             const p: Vector = new Vector(Math.floor(t.x), Math.floor(t.y));
             let color: Color|undefined = undefined;
-            if (Math.abs(p.x)%2 === Math.abs(p.y%2)) {
+            if ((Math.abs(p.x) + Math.abs(p.y))%2) {
                 color = Color.green();
             } else {
                 color = Color.magenta();
@@ -474,6 +483,20 @@ async function init(): Promise<[Player, Scene]> {
 let start: number | undefined = undefined;
 let previousTimestamp: number | undefined = undefined;
 
+function canGoThere(scene: Scene, p: Vector): boolean {
+    const top_left = new Vector(p.x - PLAYER_SIZE/2, p.y - PLAYER_SIZE/2);
+    for (let x = 0; x < 2; x++) {
+        for (let y = 0; y < 2; y++) {
+            const current = new Vector(top_left.x + x*PLAYER_SIZE, top_left.y + y*PLAYER_SIZE);
+            if (insideScene(scene, current)
+                && scene[Math.floor(current.y)]?.[Math.floor(current.x)] !== null) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 function renderFrame(ctx: CanvasRenderingContext2D, player: Player, scene: Scene) {
     const step = (timestamp: number) => {
         if (start === undefined) {
@@ -501,8 +524,17 @@ function renderFrame(ctx: CanvasRenderingContext2D, player: Player, scene: Scene
             angular_velocity += PLAYER_ANGULAR_SPEED * delta_time;
         }
 
-        player.direction = player.direction.rotate(angular_velocity);
-        player.position = player.position.add(player.direction.scale(velocity));
+        const td = player.direction.rotate(angular_velocity);
+        const movement = player.direction.scale(velocity);
+        const x_move = player.position.add(new Vector(movement.x, 0));
+        if (canGoThere(scene, x_move)) {
+            player.position = x_move;
+        }
+        const y_move = player.position.add(new Vector(0, movement.y));
+        if (canGoThere(scene, y_move)) {
+            player.position = y_move;
+        }
+        player.direction = td
         renderGame(ctx, scene, player);
         window.requestAnimationFrame(step);
     }
@@ -532,6 +564,8 @@ async function loadImage(url: string): Promise<HTMLImageElement> {
     if (ctx === null) {
         throw new Error("2D context is not supported.");
     }
+
+    ctx.imageSmoothingEnabled = false;
 
     // draw(ctx);
     let [player, scene] = await init();
