@@ -458,9 +458,7 @@ async function init(): Promise<[Player, Scene]> {
         event.stopPropagation();
     });
 
-    const yellow_jpg: HTMLImageElement = await loadImage("assets/yellow.jpg");
     const wall: HTMLImageElement = await loadImage("assets/DSC_1025_0.jpg")
-
     const scene: Scene = [
         [null,  null,  wall, wall, null, null, null, null, null],
         [null,  null,   null,  wall, null, null, null, null, null],
