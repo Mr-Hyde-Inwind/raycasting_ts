@@ -9,8 +9,6 @@ const PLAYER_ANGULAR_SPEED = Math.PI * 0.5;
 const PLAYER_SPEED = 1.5;
 const PLAYER_SIZE = 0.5;
 
-type Scene = Array<Array<Color|null|HTMLImageElement>>;
-
 class Color {
     r: number;
     g: number;
@@ -143,6 +141,37 @@ class Player {
     }
 }
 
+class Scene {
+    wall: Array<Color|null|HTMLImageElement>;
+    width: number;
+    height: number;
+
+    constructor(wall_map: Array<Array<Color|null|HTMLImageElement>>) {
+        // Suppose to be a rectangle
+        this.height = wall_map.length;
+        const [first_row] = wall_map;
+        if (!first_row) {
+            throw new Error("Wall map should have at least one row.")
+        }
+        this.width = first_row.length
+        this.wall = wall_map.flat();
+    }
+
+    inside(x: number, y: number) {
+        if (x < 0 || x >= this.width || y < 0 || y >= this.height) {
+            return false;
+        }
+        return true;
+    }
+
+    getWall(x: number, y: number) {
+        if (!this.inside(x, y)) {
+            return null;
+        }
+        return this.wall[y*this.width + x]
+    }
+}
+
 function snap(x: number, dx: number): number {
     if (dx > 0)
         return Math.ceil(x + Math.sign(dx)*EPS);
@@ -201,15 +230,6 @@ function strokeLine(ctx: CanvasRenderingContext2D, p1: Vector, p2: Vector) {
     ctx.stroke();
 }
 
-function sceneSize(scene: Scene): Vector {
-    const height: number = scene.length;
-    let max_width: number = 0;
-    for (const row of scene) {
-        max_width = Math.max(max_width, row.length);
-    }
-    return new Vector(max_width, height);
-}
-
 function drawCanvas(ctx: CanvasRenderingContext2D) {
     ctx.save();
     ctx.fillStyle = "#181818";
@@ -221,41 +241,32 @@ function drawCanvas(ctx: CanvasRenderingContext2D) {
 
 function renderMinimap(ctx: CanvasRenderingContext2D, scene: Scene, player: Player, factor: number) {
     ctx.save();
-    const scene_size: Vector = sceneSize(scene);
-
-    // WARNING: Not process the corner case when x === 0;
-    if (scene_size.x === 0) {
-        throw new Error("x should not be 0.");
-    }
-
-    // canvas.width / (canvas.height * x) = scene.width / scene.height
-    // x = canvas.width * scene.height / (canvas.height * scene.width)
-    const rectify: number = ctx.canvas.width * scene_size.y / ctx.canvas.height / scene_size.x
-    const factor_x: number = ctx.canvas.width / scene_size.x * factor;
-    const factor_y: number = ctx.canvas.height / scene_size.y * rectify * factor;
+    const factor_x: number = ctx.canvas.height / scene.height * factor;
+    const factor_y: number = ctx.canvas.height / scene.height * factor;
     ctx.scale(factor_x, factor_y);
     ctx.lineWidth = 0.1;
     ctx.strokeStyle = "#505050";
 
     ctx.fillStyle = "#181818";
-    ctx.fillRect(0, 0, scene_size.x, scene_size.y);
+    ctx.fillRect(0, 0, scene.width, scene.height);
 
-    for (let x = 0; x <= scene_size.x; ++x) {
-        strokeLine(ctx, new Vector(x, 0), new Vector(x, scene_size.y));
+    for (let x = 0; x <= scene.width; ++x) {
+        strokeLine(ctx, new Vector(x, 0), new Vector(x, scene.height));
     }
 
-    for (let y = 0; y <= scene_size.y; ++y) {
-        strokeLine(ctx, new Vector(0, y), new Vector(scene_size.x, y));
+    for (let y = 0; y <= scene.height; ++y) {
+        strokeLine(ctx, new Vector(0, y), new Vector(scene.width, y));
     }
 
-    for (const [y, row] of scene.entries()) {
-        for (const [x, cell] of row.entries()) {
-            if (cell instanceof Color)  {
-                ctx.fillStyle = cell.fillStyle();
+    for (let y = 0; y < scene.height; y++) {
+        for (let x = 0; x < scene.width; x++) {
+            const wall = scene.getWall(x, y);
+            if (wall instanceof Color)  {
+                ctx.fillStyle = wall.fillStyle();
                 ctx.fillRect(x, y, 1, 1);
-            } else if (cell instanceof HTMLImageElement) {
-                ctx.drawImage(cell,
-                             0, 0, cell.width, cell.height,
+            } else if (wall instanceof HTMLImageElement) {
+                ctx.drawImage(wall,
+                             0, 0, wall.width, wall.height,
                              x, y, 1, 1);
             }
         }
@@ -278,15 +289,6 @@ function renderMinimap(ctx: CanvasRenderingContext2D, scene: Scene, player: Play
     ctx.restore();
 }
 
-function insideScene(scene: Scene, p: Vector): boolean {
-    const scene_size: Vector = sceneSize(scene);
-    if (p.x < 0 || p.x >= scene_size.x ||
-        p.y < 0 || p.y >= scene_size.y) {
-        return false;
-    }
-    return true;
-}
-
 function hittingCell(p1: Vector, p2: Vector) {
     const direct_norm: Vector = p2.sub(p1).norm();
     return new Vector(Math.floor(p2.x + Math.sign(direct_norm.x)*EPS),
@@ -299,7 +301,7 @@ function castRay(scene: Scene, p1: Vector, p2: Vector) {
         const c = hittingCell(p1, p2);
         // ?. will return `undefined` when scene[c.y] not exists.
         // So, use "!=" instead of "!==" to check null value.
-        if (insideScene(scene, c) && scene[c.y]?.[c.x] != null) {
+        if (scene.inside(c.x, c.y) && scene.getWall(c.x, c.y) != null) {
             break;
         }
         const p3 = rayStep(p1, p2);
@@ -381,8 +383,8 @@ function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, player: Player
     for (let x = 0; x < SCREEN_WIDTH; ++x) {
         const p = castRay(scene, player.position, player.position.add(r1.lerp(r2, x/SCREEN_WIDTH)));
         const cell_pos = hittingCell(player.position, p);
-        const cell: Color|HTMLImageElement|null|undefined = scene[cell_pos.y]?.[cell_pos.x];
-        if (insideScene(scene, cell_pos)) {
+        const cell: Color|HTMLImageElement|null|undefined = scene.getWall(cell_pos.x, cell_pos.y);
+        if (scene.inside(cell_pos.x, cell_pos.y)) {
             const v = p.sub(player.position);
             const d = player.direction;
             const wall_perpen_dist = v.dot(d);
@@ -422,7 +424,7 @@ function renderGame(ctx: CanvasRenderingContext2D, scene: Scene, player: Player)
     renderFloor(ctx, scene, player);
     renderCeiling(ctx, scene, player);
     renderScene(ctx, scene, player);
-    renderMinimap(ctx, scene, player, 0.2);
+    renderMinimap(ctx, scene, player, 0.33);
 }
 
 let moving_forward: boolean = false;
@@ -459,7 +461,7 @@ async function init(): Promise<[Player, Scene]> {
     });
 
     const wall: HTMLImageElement = await loadImage("assets/DSC_1025_0.jpg")
-    const scene: Scene = [
+    const scene: Scene = new Scene([
         [null,  null,  wall, wall, null, null, null, null, null],
         [null,  null,   null,  wall, null, null, null, null, null],
         [null, wall, wall, wall, null, null, null, null, null],
@@ -467,10 +469,9 @@ async function init(): Promise<[Player, Scene]> {
         [null,  null,   null,   null,  null, null, null, null, null],
         [null,  null,   wall,   null,  null, null, null, null, null],
         [null,  null,   null,   null,  null, null, null, null, null],
-    ];
+    ]);
 
-    const scene_size = sceneSize(scene);
-    const pos: Vector = new Vector(scene_size.x * 0.5, scene_size.y * 0.7);
+    const pos: Vector = new Vector(scene.width * 0.5, scene.height * 0.7);
     const direction: Vector = Vector.fromRadius(Math.PI / -2.0);
     const player = new Player(pos, direction);
     return new Promise<[Player, Scene]>((resolve, reject) => {
@@ -486,8 +487,8 @@ function canGoThere(scene: Scene, p: Vector): boolean {
     for (let x = 0; x < 2; x++) {
         for (let y = 0; y < 2; y++) {
             const current = new Vector(top_left.x + x*PLAYER_SIZE, top_left.y + y*PLAYER_SIZE);
-            if (insideScene(scene, current)
-                && scene[Math.floor(current.y)]?.[Math.floor(current.x)] !== null) {
+            if (scene.inside(current.x, current.y)
+                && scene.getWall(Math.floor(current.x), Math.floor(current.y))) {
                 return false;
             }
         }
