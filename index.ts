@@ -1,13 +1,15 @@
+//TODO load Image as ImageData
 const EPS: number = 1e-6;
 const NEAR_CLIPPING_PLANE: number = 0.1;
 const FAR_CLIPPING_PLANE: number = 10.0;
 const FOV: number = Math.PI * 0.5;
-const SCREEN_FACTOR = 20;
+const SCREEN_FACTOR = 40;
 const SCREEN_WIDTH = Math.floor(16*SCREEN_FACTOR);
 const SCREEN_HEIGHT = Math.floor(9*SCREEN_FACTOR);
 const PLAYER_ANGULAR_SPEED = Math.PI * 0.5;
-const PLAYER_SPEED = 1.5;
+const PLAYER_SPEED = 2.0;
 const PLAYER_SIZE = 0.5;
+type Cell = Color|null|HTMLImageElement
 
 class Color {
     r: number;
@@ -142,11 +144,11 @@ class Player {
 }
 
 class Scene {
-    wall: Array<Color|null|HTMLImageElement>;
+    wall: Array<Cell>;
     width: number;
     height: number;
 
-    constructor(wall_map: Array<Array<Color|null|HTMLImageElement>>) {
+    constructor(wall_map: Array<Array<Cell>>) {
         // Suppose to be a rectangle
         this.height = wall_map.length;
         const [first_row] = wall_map;
@@ -164,11 +166,31 @@ class Scene {
         return true;
     }
 
-    getWall(x: number, y: number) {
+    getWall(x: number, y: number): Cell {
         if (!this.inside(x, y)) {
             return null;
         }
-        return this.wall[y*this.width + x]
+        return this.wall[y*this.width + x] ?? null;
+    }
+
+    getFloor(x: number, y: number) {
+        let color: Color|undefined = undefined;
+        if ((Math.abs(Math.floor(x)) + Math.abs(Math.floor(y)))%2) {
+            color = Color.green();
+        } else {
+            color = Color.magenta();
+        }
+        return color;
+    }
+
+    getCeiling(x: number, y: number) {
+        let color: Color|undefined = undefined;
+        if ((Math.abs(Math.floor(x)) + Math.abs(Math.floor(y)))%2) {
+            color = Color.red();
+        } else {
+            color = Color.blue();
+        }
+        return color;
     }
 }
 
@@ -335,13 +357,7 @@ function renderCeiling(ctx: CanvasRenderingContext2D, scene: Scene, player: Play
         const extended_r2: Vector = r2.norm().scale(actual_len)
         for (let x = 0; x <= SCREEN_WIDTH; x++) {
             const t: Vector = extended_r1.lerp(extended_r2, x/SCREEN_WIDTH).add(player.position);
-            const p: Vector = new Vector(Math.floor(t.x), Math.floor(t.y));
-            let color: Color|undefined = undefined;
-            if ((Math.abs(p.x)+Math.abs(p.y))%2) {
-                color = Color.blue();
-            } else {
-                color = Color.red();
-            }
+            const color = scene.getCeiling(t.x, t.y);
             ctx.fillStyle = color.brightness(1 - y/player_height).fillStyle();
             ctx.fillRect(x, y, 1, 1);
         }
@@ -362,13 +378,7 @@ function renderFloor(ctx: CanvasRenderingContext2D, scene: Scene, player: Player
         const extended_r2: Vector = r2.norm().scale(actual_len)
         for (let x = 0; x <= SCREEN_WIDTH; x++) {
             const t: Vector = extended_r1.lerp(extended_r2, x/SCREEN_WIDTH).add(player.position);
-            const p: Vector = new Vector(Math.floor(t.x), Math.floor(t.y));
-            let color: Color|undefined = undefined;
-            if ((Math.abs(p.x) + Math.abs(p.y))%2) {
-                color = Color.green();
-            } else {
-                color = Color.magenta();
-            }
+            const color = scene.getFloor(t.x, t.y);
             ctx.fillStyle = color.brightness(1 - z/player_height).fillStyle();
             ctx.fillRect(x, y, 1, 1);
         }
