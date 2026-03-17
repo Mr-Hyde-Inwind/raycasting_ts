@@ -1,15 +1,14 @@
-//TODO load Image as ImageData
 const EPS: number = 1e-6;
 const NEAR_CLIPPING_PLANE: number = 0.1;
 const FAR_CLIPPING_PLANE: number = 10.0;
 const FOV: number = Math.PI * 0.5;
-const SCREEN_FACTOR = 40;
+const SCREEN_FACTOR = 10;
 const SCREEN_WIDTH = Math.floor(16*SCREEN_FACTOR);
 const SCREEN_HEIGHT = Math.floor(9*SCREEN_FACTOR);
 const PLAYER_ANGULAR_SPEED = Math.PI * 0.5;
 const PLAYER_SPEED = 2.0;
 const PLAYER_SIZE = 0.5;
-type Cell = Color|null|HTMLImageElement
+type Cell = Color|null|HTMLImageElement|ImageData;
 
 class Color {
     r: number;
@@ -305,8 +304,8 @@ function renderMinimapOffscreen(ctx: OffscreenCanvasRenderingContext2D, scene: S
 
 function renderMinimap(ctx: CanvasRenderingContext2D, scene: Scene, player: Player, factor: number) {
     ctx.save();
-    const factor_x: number = scene.height * factor;
-    const factor_y: number = scene.height * factor;
+    const factor_x: number = ctx.canvas.height / scene.height * factor;
+    const factor_y: number = ctx.canvas.height / scene.height * factor;
     ctx.scale(factor_x, factor_y);
     ctx.lineWidth = 0.1;
     ctx.strokeStyle = "#505050";
@@ -390,10 +389,10 @@ function renderCeilingImageData(offImageData: ImageData, scene: Scene, player: P
             const color = scene.getCeiling(t.x, t.y);
             if (color instanceof Color) {
                 const renderColor = color.brightness(1 - z/player_height);
-                imageData[(offImageData.width * y + x) * 4 + 0] = Math.floor(renderColor.r * 255)
-                imageData[(offImageData.width * y + x) * 4 + 1] = Math.floor(renderColor.g * 255)
-                imageData[(offImageData.width * y + x) * 4 + 2] = Math.floor(renderColor.b * 255)
-                imageData[(offImageData.width * y + x) * 4 + 3] = Math.floor(renderColor.a * 255)
+                imageData[(offImageData.width * y + x) * 4 + 0] = renderColor.r * 255;
+                imageData[(offImageData.width * y + x) * 4 + 1] = renderColor.g * 255;
+                imageData[(offImageData.width * y + x) * 4 + 2] = renderColor.b * 255;
+                imageData[(offImageData.width * y + x) * 4 + 3] = renderColor.a * 255;
             } else {
                 throw new Error("Floor with texture not implemented yet.");
             }
@@ -437,10 +436,10 @@ function renderFloorImageData(offImageData: ImageData, scene: Scene, player: Pla
             const color = scene.getFloor(t.x, t.y);
             if (color instanceof Color) {
                 const renderColor = color.brightness(1 - z/player_height);
-                imageData[(offImageData.width * y + x) * 4 + 0] = Math.floor(renderColor.r * 255)
-                imageData[(offImageData.width * y + x) * 4 + 1] = Math.floor(renderColor.g * 255)
-                imageData[(offImageData.width * y + x) * 4 + 2] = Math.floor(renderColor.b * 255)
-                imageData[(offImageData.width * y + x) * 4 + 3] = Math.floor(renderColor.a * 255)
+                imageData[(offImageData.width * y + x) * 4 + 0] = renderColor.r * 255;
+                imageData[(offImageData.width * y + x) * 4 + 1] = renderColor.g * 255;
+                imageData[(offImageData.width * y + x) * 4 + 2] = renderColor.b * 255;
+                imageData[(offImageData.width * y + x) * 4 + 3] = renderColor.a * 255;
             } else {
                 throw new Error("Floor with texture not implemented yet.");
             }
@@ -475,7 +474,7 @@ function renderWallImageData(offImageData: ImageData, scene: Scene, player: Play
     for (let x = 0; x < SCREEN_WIDTH; ++x) {
         const p = castRay(scene, player.position, player.position.add(r1.lerp(r2, x/SCREEN_WIDTH)));
         const cell_pos = hittingCell(player.position, p);
-        const cell: Color|HTMLImageElement|null|undefined = scene.getWall(cell_pos.x, cell_pos.y);
+        const cell: Cell = scene.getWall(cell_pos.x, cell_pos.y);
         if (scene.inside(cell_pos.x, cell_pos.y)) {
             const v = p.sub(player.position);
             const d = player.direction;
@@ -484,8 +483,8 @@ function renderWallImageData(offImageData: ImageData, scene: Scene, player: Play
             if (cell instanceof Color) {
                 const renderColor = cell.brightness(1/wall_perpen_dist);
                 const dx = Math.floor(x);
-                const renderLenth = Math.ceil(strip_height);
-                for (let i = 0; i <= renderLenth; i++) {
+                const renderLength = Math.ceil(strip_height);
+                for (let i = 0; i <= renderLength; i++) {
                     const dy = Math.floor((SCREEN_HEIGHT - strip_height)*0.5) + i;
                     imageData[(offImageData.width * dy + dx) * 4 + 0] = Math.floor(renderColor.r * 255)
                     imageData[(offImageData.width * dy + dx) * 4 + 1] = Math.floor(renderColor.g * 255)
@@ -493,8 +492,28 @@ function renderWallImageData(offImageData: ImageData, scene: Scene, player: Play
                     imageData[(offImageData.width * dy + dx) * 4 + 3] = Math.floor(renderColor.a * 255)
                     
                 }
-            } else if (cell instanceof HTMLImageElement) {
-                throw new Error("Not implemented");
+            } else if (cell instanceof ImageData) {
+                const t: Vector = p.sub(cell_pos);
+                let tx: number = 0;
+                if ((Math.abs(t.x) < EPS || Math.abs(t.x - 1) < EPS) && t.y > 0) {
+                    tx = t.y;
+                } else {
+                    tx = t.x;
+                }
+
+                const dx = Math.floor(x);
+                const sx = Math.floor(tx*cell.width);
+                const renderLength = Math.ceil(strip_height);
+                for (let i = 0; i <= renderLength; i++) {
+                    const dy = Math.floor((SCREEN_HEIGHT - strip_height)*0.5) + i;
+                    const sy = Math.floor(i/renderLength * cell.height);
+                    imageData[(offImageData.width * dy + dx) * 4 + 0] = cell.data[(cell.width * sy + sx) * 4 + 0] ?? 0;
+                    imageData[(offImageData.width * dy + dx) * 4 + 1] = cell.data[(cell.width * sy + sx) * 4 + 1] ?? 0;
+                    imageData[(offImageData.width * dy + dx) * 4 + 2] = cell.data[(cell.width * sy + sx) * 4 + 2] ?? 0;
+                    imageData[(offImageData.width * dy + dx) * 4 + 3] = Math.floor(255 / wall_perpen_dist);
+                }
+            } else {
+                throw new Error("Unsupported wall type.");
             }
         }
     }
@@ -507,7 +526,7 @@ function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, player: Player
     for (let x = 0; x < SCREEN_WIDTH; ++x) {
         const p = castRay(scene, player.position, player.position.add(r1.lerp(r2, x/SCREEN_WIDTH)));
         const cell_pos = hittingCell(player.position, p);
-        const cell: Color|HTMLImageElement|null|undefined = scene.getWall(cell_pos.x, cell_pos.y);
+        const cell: Cell = scene.getWall(cell_pos.x, cell_pos.y);
         if (scene.inside(cell_pos.x, cell_pos.y)) {
             const v = p.sub(player.position);
             const d = player.direction;
@@ -555,10 +574,11 @@ function renderGame(off_ctx: OffscreenCanvasRenderingContext2D,
     //renderCeiling(ctx, scene, player);
     //renderScene(ctx, scene, player);
     // renderMinimap(ctx, scene, player, 0.33);
+    // renderMinimapOffscreen(off_ctx, scene, player, 0.33);
     off_ctx.putImageData(offImageData, 0, 0);
-    renderMinimapOffscreen(off_ctx, scene, player, 0.33);
 
     ctx.drawImage(off_ctx.canvas, 0, 0, ctx.canvas.width, ctx.canvas.height);
+    renderMinimap(ctx, scene, player, 0.33);
 }
 
 let moving_forward: boolean = false;
@@ -594,7 +614,8 @@ async function init(): Promise<[Player, Scene]> {
         event.stopPropagation();
     });
 
-    const wall: Cell = await loadImage("assets/DSC_1025_0.jpg").then(() => Color.cyan())
+    const wall: Cell = await loadImageData("assets/DSC_1025_0.jpg");
+    // const wall: Cell = await loadImage("assets/DSC_1025_0.jpg");
     const scene: Scene = new Scene([
         [null,  null,  wall, wall, null, null, null, null, null],
         [null,  null,   null,  wall, null, null, null, null, null],
@@ -686,6 +707,16 @@ async function loadImage(url: string): Promise<HTMLImageElement> {
         image.onload = () => resolve(image);
         image.onerror = reject;
     });
+}
+
+async function loadImageData(url: string): Promise<ImageData> {
+    const image = await loadImage(url);
+    const backCtx = new OffscreenCanvas(image.width, image.height).getContext("2d");
+    if (backCtx === null) {
+        throw new Error("2D offScreenCanvas's context is not supported.");
+    }
+    backCtx.drawImage(image, 0, 0);
+    return backCtx.getImageData(0, 0, image.width, image.height);
 }
 
 (async () => {
