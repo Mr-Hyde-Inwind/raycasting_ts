@@ -2,10 +2,10 @@ const EPS: number = 1e-6;
 const NEAR_CLIPPING_PLANE: number = 0.1;
 const FAR_CLIPPING_PLANE: number = 10.0;
 const FOV: number = Math.PI * 0.5;
-const SCREEN_FACTOR = 10;
+const SCREEN_FACTOR = 20;
 const SCREEN_WIDTH = Math.floor(16*SCREEN_FACTOR);
 const SCREEN_HEIGHT = Math.floor(9*SCREEN_FACTOR);
-const PLAYER_ANGULAR_SPEED = Math.PI * 0.5;
+const PLAYER_ANGULAR_SPEED = Math.PI * 1.0;
 const PLAYER_SPEED = 2.0;
 const PLAYER_SIZE = 0.5;
 type Cell = Color|null|HTMLImageElement|ImageData;
@@ -252,104 +252,54 @@ function strokeLine(ctx: CanvasRenderingContext2D|OffscreenCanvasRenderingContex
     ctx.stroke();
 }
 
-function renderMinimapOffscreen(ctx: OffscreenCanvasRenderingContext2D, scene: Scene, player: Player, factor: number) {
-    ctx.save();
-    const factor_x: number = ctx.canvas.height / scene.height * factor;
-    const factor_y: number = ctx.canvas.height / scene.height * factor;
-    ctx.scale(factor_x, factor_y);
-    ctx.lineWidth = 0.1;
-    ctx.strokeStyle = "#505050";
+function renderMinimapOffscreen(offCtx: OffscreenCanvasRenderingContext2D, scene: Scene, player: Player, factor: number) {
+    offCtx.save();
+    const factor_x: number = SCREEN_HEIGHT / scene.height * factor;
+    const factor_y: number = SCREEN_HEIGHT / scene.height * factor;
+    offCtx.scale(factor_x, factor_y);
+    offCtx.lineWidth = 0.1;
+    offCtx.strokeStyle = "#505050";
 
-    ctx.fillStyle = "#181818";
-    ctx.fillRect(0, 0, scene.width, scene.height);
+    offCtx.fillStyle = "#181818";
+    offCtx.fillRect(0, 0, scene.width, scene.height);
 
     for (let x = 0; x <= scene.width; ++x) {
-        strokeLine(ctx, new Vector(x, 0), new Vector(x, scene.height));
+        strokeLine(offCtx, new Vector(x, 0), new Vector(x, scene.height));
     }
 
     for (let y = 0; y <= scene.height; ++y) {
-        strokeLine(ctx, new Vector(0, y), new Vector(scene.width, y));
+        strokeLine(offCtx, new Vector(0, y), new Vector(scene.width, y));
     }
 
     for (let y = 0; y < scene.height; y++) {
         for (let x = 0; x < scene.width; x++) {
             const wall = scene.getWall(x, y);
             if (wall instanceof Color)  {
-                ctx.fillStyle = wall.fillStyle();
-                ctx.fillRect(x, y, 1, 1);
+                offCtx.fillStyle = wall.fillStyle();
+                offCtx.fillRect(x, y, 1, 1);
             } else if (wall instanceof HTMLImageElement) {
-                ctx.drawImage(wall,
+                offCtx.drawImage(wall,
                              0, 0, wall.width, wall.height,
                              x, y, 1, 1);
             }
         }
     }
 
-    ctx.fillStyle = "magenta";
-    ctx.strokeStyle = "magenta";
+    offCtx.fillStyle = "magenta";
+    offCtx.strokeStyle = "magenta";
 
-    ctx.beginPath()
+    offCtx.beginPath()
     const top = player.position.add(player.direction.scale(PLAYER_SIZE/2));
     const tp = player.position.sub(player.direction.scale(PLAYER_SIZE/2));
     const bottom_left = tp.add(player.direction.scale(PLAYER_SIZE/2).rot90());
     const bottom_right = tp.sub(player.direction.scale(PLAYER_SIZE/2).rot90());
 
-    ctx.moveTo(top.x, top.y);
-    ctx.lineTo(bottom_left.x, bottom_left.y);
-    ctx.lineTo(bottom_right.x, bottom_right.y);
-    ctx.fill();
+    offCtx.moveTo(top.x, top.y);
+    offCtx.lineTo(bottom_left.x, bottom_left.y);
+    offCtx.lineTo(bottom_right.x, bottom_right.y);
+    offCtx.fill();
 
-    ctx.restore();
-}
-
-function renderMinimap(ctx: CanvasRenderingContext2D, scene: Scene, player: Player, factor: number) {
-    ctx.save();
-    const factor_x: number = ctx.canvas.height / scene.height * factor;
-    const factor_y: number = ctx.canvas.height / scene.height * factor;
-    ctx.scale(factor_x, factor_y);
-    ctx.lineWidth = 0.1;
-    ctx.strokeStyle = "#505050";
-
-    ctx.fillStyle = "#181818";
-    ctx.fillRect(0, 0, scene.width, scene.height);
-
-    for (let x = 0; x <= scene.width; ++x) {
-        strokeLine(ctx, new Vector(x, 0), new Vector(x, scene.height));
-    }
-
-    for (let y = 0; y <= scene.height; ++y) {
-        strokeLine(ctx, new Vector(0, y), new Vector(scene.width, y));
-    }
-
-    for (let y = 0; y < scene.height; y++) {
-        for (let x = 0; x < scene.width; x++) {
-            const wall = scene.getWall(x, y);
-            if (wall instanceof Color)  {
-                ctx.fillStyle = wall.fillStyle();
-                ctx.fillRect(x, y, 1, 1);
-            } else if (wall instanceof HTMLImageElement) {
-                ctx.drawImage(wall,
-                             0, 0, wall.width, wall.height,
-                             x, y, 1, 1);
-            }
-        }
-    }
-
-    ctx.fillStyle = "magenta";
-    ctx.strokeStyle = "magenta";
-
-    ctx.beginPath()
-    const top = player.position.add(player.direction.scale(PLAYER_SIZE/2));
-    const tp = player.position.sub(player.direction.scale(PLAYER_SIZE/2));
-    const bottom_left = tp.add(player.direction.scale(PLAYER_SIZE/2).rot90());
-    const bottom_right = tp.sub(player.direction.scale(PLAYER_SIZE/2).rot90());
-
-    ctx.moveTo(top.x, top.y);
-    ctx.lineTo(bottom_left.x, bottom_left.y);
-    ctx.lineTo(bottom_right.x, bottom_right.y);
-    ctx.fill();
-
-    ctx.restore();
+    offCtx.restore();
 }
 
 function hittingCell(p1: Vector, p2: Vector) {
@@ -400,27 +350,6 @@ function renderCeilingImageData(offImageData: ImageData, scene: Scene, player: P
     }
 }
 
-function renderCeiling(ctx: CanvasRenderingContext2D, scene: Scene, player: Player) {
-    ctx.save();
-    const player_height: number = SCREEN_HEIGHT / 2;
-    const [r1, r2]: [Vector, Vector] = player.fovRange();
-    const ray_len: number = r1.length();
-    ctx.scale(ctx.canvas.width / SCREEN_WIDTH, ctx.canvas.height / SCREEN_HEIGHT);
-    for (let y = SCREEN_HEIGHT / 2 - 1; y >= 0; y--) {
-        const z = y;
-        const actual_len = ray_len / (player_height - z) / NEAR_CLIPPING_PLANE * player_height;
-        const extended_r1: Vector = r1.norm().scale(actual_len)
-        const extended_r2: Vector = r2.norm().scale(actual_len)
-        for (let x = 0; x <= SCREEN_WIDTH; x++) {
-            const t: Vector = extended_r1.lerp(extended_r2, x/SCREEN_WIDTH).add(player.position);
-            const color = scene.getCeiling(t.x, t.y);
-            ctx.fillStyle = color.brightness(1 - y/player_height).fillStyle();
-            ctx.fillRect(x, y, 1, 1);
-        }
-    }
-    ctx.restore();
-}
-
 function renderFloorImageData(offImageData: ImageData, scene: Scene, player: Player) {
     const imageData = offImageData.data;
     const player_height: number = SCREEN_HEIGHT / 2;
@@ -445,27 +374,6 @@ function renderFloorImageData(offImageData: ImageData, scene: Scene, player: Pla
             }
         }
     }
-}
-
-function renderFloor(ctx: CanvasRenderingContext2D, scene: Scene, player: Player) {
-    ctx.save();
-    const player_height: number = SCREEN_HEIGHT / 2;
-    const [r1, r2]: [Vector, Vector] = player.fovRange();
-    const ray_len: number = r1.length();
-    ctx.scale(ctx.canvas.width / SCREEN_WIDTH, ctx.canvas.height / SCREEN_HEIGHT);
-    for (let y = SCREEN_HEIGHT/2; y < SCREEN_HEIGHT; y++) {
-        const z = (SCREEN_HEIGHT - y);
-        const actual_len = ray_len / (player_height - z) / NEAR_CLIPPING_PLANE * player_height;
-        const extended_r1: Vector = r1.norm().scale(actual_len)
-        const extended_r2: Vector = r2.norm().scale(actual_len)
-        for (let x = 0; x <= SCREEN_WIDTH; x++) {
-            const t: Vector = extended_r1.lerp(extended_r2, x/SCREEN_WIDTH).add(player.position);
-            const color = scene.getFloor(t.x, t.y);
-            ctx.fillStyle = color.brightness(1 - z/player_height).fillStyle();
-            ctx.fillRect(x, y, 1, 1);
-        }
-    }
-    ctx.restore();
 }
 
 function renderWallImageData(offImageData: ImageData, scene: Scene, player: Player) {
@@ -519,9 +427,8 @@ function renderWallImageData(offImageData: ImageData, scene: Scene, player: Play
     }
 }
 
-function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, player: Player) {
-    ctx.save();
-    ctx.scale(ctx.canvas.width / SCREEN_WIDTH, ctx.canvas.height / SCREEN_HEIGHT);
+function renderWallOffscreenCanvas(offCtx: OffscreenCanvasRenderingContext2D, scene: Scene, player: Player) {
+    offCtx.save();
     const [r1, r2] = player.fovRange();
     for (let x = 0; x < SCREEN_WIDTH; ++x) {
         const p = castRay(scene, player.position, player.position.add(r1.lerp(r2, x/SCREEN_WIDTH)));
@@ -533,8 +440,8 @@ function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, player: Player
             const wall_perpen_dist = v.dot(d);
             const strip_height = SCREEN_HEIGHT / wall_perpen_dist;
             if (cell instanceof Color) {
-                ctx.fillStyle = cell.brightness(1/wall_perpen_dist).fillStyle();
-                ctx.fillRect(
+                offCtx.fillStyle = cell.brightness(1/wall_perpen_dist).fillStyle();
+                offCtx.fillRect(
                     Math.floor(x), Math.floor((SCREEN_HEIGHT - strip_height)*0.5),
                     1, Math.ceil(strip_height));
             } else if (cell instanceof HTMLImageElement) {
@@ -546,19 +453,19 @@ function renderScene(ctx: CanvasRenderingContext2D, scene: Scene, player: Player
                     tx = t.x;
                 }
 
-                ctx.drawImage(
+                offCtx.drawImage(
                     cell,
                     Math.floor(tx*cell.width), 0, 1, cell.height,
                     Math.floor(x), Math.floor((SCREEN_HEIGHT - strip_height) * 0.5),
-                    1, Math.ceil(strip_height * 1.01));
-                ctx.fillStyle = new Color(0, 0, 0, 1 - 1/wall_perpen_dist).fillStyle();
-                ctx.fillRect(
+                    1, Math.ceil(strip_height));
+                offCtx.fillStyle = new Color(0, 0, 0, 1 - 1/wall_perpen_dist).fillStyle();
+                offCtx.fillRect(
                     Math.floor(x), Math.floor((SCREEN_HEIGHT - strip_height)*0.5),
-                    1, Math.ceil(strip_height * 1.01));
+                    1, Math.ceil(strip_height));
             }
         }
     }
-    ctx.restore();
+    offCtx.restore();
 }
 
 function renderGame(off_ctx: OffscreenCanvasRenderingContext2D,
@@ -569,16 +476,12 @@ function renderGame(off_ctx: OffscreenCanvasRenderingContext2D,
 
     renderFloorImageData(offImageData, scene, player);
     renderCeilingImageData(offImageData, scene, player);
-    renderWallImageData(offImageData, scene, player);
-    //renderFloor(ctx, scene, player);
-    //renderCeiling(ctx, scene, player);
-    //renderScene(ctx, scene, player);
-    // renderMinimap(ctx, scene, player, 0.33);
-    // renderMinimapOffscreen(off_ctx, scene, player, 0.33);
     off_ctx.putImageData(offImageData, 0, 0);
 
+    renderWallOffscreenCanvas(off_ctx, scene, player);
+    renderMinimapOffscreen(off_ctx, scene, player, 0.33);
+
     ctx.drawImage(off_ctx.canvas, 0, 0, ctx.canvas.width, ctx.canvas.height);
-    renderMinimap(ctx, scene, player, 0.33);
 }
 
 let moving_forward: boolean = false;
@@ -614,8 +517,8 @@ async function init(): Promise<[Player, Scene]> {
         event.stopPropagation();
     });
 
-    const wall: Cell = await loadImageData("assets/DSC_1025_0.jpg");
-    // const wall: Cell = await loadImage("assets/DSC_1025_0.jpg");
+    // const wall: Cell = await loadImageData("assets/DSC_1025_0.jpg");
+    const wall: Cell = await loadImage("assets/DSC_1025_0.jpg");
     const scene: Scene = new Scene([
         [null,  null,  wall, wall, null, null, null, null, null],
         [null,  null,   null,  wall, null, null, null, null, null],
