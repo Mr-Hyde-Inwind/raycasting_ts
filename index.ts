@@ -2,7 +2,7 @@ const EPS: number = 1e-6;
 const NEAR_CLIPPING_PLANE: number = 0.1;
 const FAR_CLIPPING_PLANE: number = 10.0;
 const FOV: number = Math.PI * 0.5;
-const SCREEN_FACTOR = 20;
+const SCREEN_FACTOR = 30;
 const SCREEN_WIDTH = Math.floor(16*SCREEN_FACTOR);
 const SCREEN_HEIGHT = Math.floor(9*SCREEN_FACTOR);
 const PLAYER_ANGULAR_SPEED = Math.PI * 1.0;
@@ -185,9 +185,9 @@ class Scene {
     getCeiling(x: number, y: number) {
         let color: Color|undefined = undefined;
         if ((Math.abs(Math.floor(x)) + Math.abs(Math.floor(y)))%2) {
-            color = Color.red();
+            color = new Color(235/255, 121/255, 108/255, 1.0);
         } else {
-            color = Color.blue();
+            color = new Color(69/255, 26/255, 21/255, 1.0);
         }
         return color;
     }
