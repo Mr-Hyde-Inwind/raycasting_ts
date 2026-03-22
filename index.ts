@@ -73,11 +73,15 @@ class Vector {
     }
 
     add(that: Vector): Vector {
-        return new Vector(this.x + that.x, this.y + that.y);
+        this.x += that.x;
+        this.y += that.y;
+        return this;
     }
 
     sub(that: Vector): Vector {
-        return new Vector(this.x - that.x, this.y - that.y);
+        this.x -= that.x;
+        this.y -= that.y;
+        return this;
     }
 
     mul(that: Vector): Vector {
@@ -106,7 +110,7 @@ class Vector {
     }
 
     distanceTo(that: Vector): number {
-        return that.sub(this).length();
+        return that.clone().sub(this).length();
     }
 
     rotate(rad: number): Vector {
@@ -115,12 +119,16 @@ class Vector {
         return new Vector(r*Math.cos(theta), r*Math.sin(theta));
     }
 
+    clone(): Vector {
+        return new Vector(this.x, this.y);
+    }
+
     rot90(): Vector {
         return new Vector(-this.y, this.x)
     }
 
     lerp(that: Vector, factor: number): Vector {
-        return this.add(that.sub(this).scale(factor));
+        return this.clone().add(that.clone().sub(this).scale(factor));
     }
 }
 
@@ -211,7 +219,7 @@ function snap(x: number, dx: number): number {
 // (y2 - y1)/(x2 - x1) = k;
 // y1 - k*x1 = d;
 function rayStep(p1: Vector, p2: Vector): Vector {
-    const direct_norm: Vector = p2.sub(p1).norm();
+    const direct_norm: Vector = p2.clone().sub(p1).norm();
     let p3: Vector = p2;
     if (direct_norm.x !== 0) {
         const slope: number = direct_norm.y / direct_norm.x;
@@ -289,10 +297,10 @@ function renderMinimapOffscreen(offCtx: OffscreenCanvasRenderingContext2D, scene
     offCtx.strokeStyle = "magenta";
 
     offCtx.beginPath()
-    const top = player.position.add(player.direction.scale(PLAYER_SIZE/2));
-    const tp = player.position.sub(player.direction.scale(PLAYER_SIZE/2));
-    const bottom_left = tp.add(player.direction.scale(PLAYER_SIZE/2).rot90());
-    const bottom_right = tp.sub(player.direction.scale(PLAYER_SIZE/2).rot90());
+    const top = player.position.clone().add(player.direction.scale(PLAYER_SIZE/2));
+    const tp = player.position.clone().sub(player.direction.scale(PLAYER_SIZE/2));
+    const bottom_left = tp.clone().add(player.direction.scale(PLAYER_SIZE/2).rot90());
+    const bottom_right = tp.clone().sub(player.direction.scale(PLAYER_SIZE/2).rot90());
 
     offCtx.moveTo(top.x, top.y);
     offCtx.lineTo(bottom_left.x, bottom_left.y);
@@ -303,7 +311,7 @@ function renderMinimapOffscreen(offCtx: OffscreenCanvasRenderingContext2D, scene
 }
 
 function hittingCell(p1: Vector, p2: Vector) {
-    const direct_norm: Vector = p2.sub(p1).norm();
+    const direct_norm: Vector = p2.clone().sub(p1).norm();
     return new Vector(Math.floor(p2.x + Math.sign(direct_norm.x)*EPS),
                       Math.floor(p2.y + Math.sign(direct_norm.y)*EPS));
 }
@@ -335,7 +343,7 @@ function renderCeilingImageData(offImageData: ImageData, scene: Scene, player: P
         const extended_r1: Vector = r1.norm().scale(actual_len)
         const extended_r2: Vector = r2.norm().scale(actual_len)
         for (let x = 0; x <= SCREEN_WIDTH; x++) {
-            const t: Vector = extended_r1.lerp(extended_r2, x/SCREEN_WIDTH).add(player.position);
+            const t: Vector = extended_r1.lerp(extended_r2, x/SCREEN_WIDTH).clone().add(player.position);
             const color = scene.getCeiling(t.x, t.y);
             if (color instanceof Color) {
                 const renderColor = color.brightness(1 - z/player_height);
@@ -361,7 +369,7 @@ function renderFloorImageData(offImageData: ImageData, scene: Scene, player: Pla
         const extended_r1: Vector = r1.norm().scale(actual_len)
         const extended_r2: Vector = r2.norm().scale(actual_len)
         for (let x = 0; x <= SCREEN_WIDTH; x++) {
-            const t: Vector = extended_r1.lerp(extended_r2, x/SCREEN_WIDTH).add(player.position);
+            const t: Vector = extended_r1.lerp(extended_r2, x/SCREEN_WIDTH).clone().add(player.position);
             const color = scene.getFloor(t.x, t.y);
             if (color instanceof Color) {
                 const renderColor = color.brightness(1 - z/player_height);
@@ -380,11 +388,11 @@ function renderWallImageData(offImageData: ImageData, scene: Scene, player: Play
     const [r1, r2] = player.fovRange();
     const imageData = offImageData.data;
     for (let x = 0; x < SCREEN_WIDTH; ++x) {
-        const p = castRay(scene, player.position, player.position.add(r1.lerp(r2, x/SCREEN_WIDTH)));
+        const p = castRay(scene, player.position, player.position.clone().add(r1.lerp(r2, x/SCREEN_WIDTH)));
         const cell_pos = hittingCell(player.position, p);
         const cell: Cell = scene.getWall(cell_pos.x, cell_pos.y);
         if (scene.inside(cell_pos.x, cell_pos.y)) {
-            const v = p.sub(player.position);
+            const v = p.clone().sub(player.position);
             const d = player.direction;
             const wall_perpen_dist = v.dot(d);
             const strip_height = SCREEN_HEIGHT / wall_perpen_dist;
@@ -401,7 +409,7 @@ function renderWallImageData(offImageData: ImageData, scene: Scene, player: Play
                     
                 }
             } else if (cell instanceof ImageData) {
-                const t: Vector = p.sub(cell_pos);
+                const t: Vector = p.clone().sub(cell_pos);
                 let tx: number = 0;
                 if ((Math.abs(t.x) < EPS || Math.abs(t.x - 1) < EPS) && t.y > 0) {
                     tx = t.y;
@@ -431,11 +439,11 @@ function renderWallOffscreenCanvas(offCtx: OffscreenCanvasRenderingContext2D, sc
     offCtx.save();
     const [r1, r2] = player.fovRange();
     for (let x = 0; x < SCREEN_WIDTH; ++x) {
-        const p = castRay(scene, player.position, player.position.add(r1.lerp(r2, x/SCREEN_WIDTH)));
+        const p = castRay(scene, player.position, player.position.clone().add(r1.lerp(r2, x/SCREEN_WIDTH)));
         const cell_pos = hittingCell(player.position, p);
         const cell: Cell = scene.getWall(cell_pos.x, cell_pos.y);
         if (scene.inside(cell_pos.x, cell_pos.y)) {
-            const v = p.sub(player.position);
+            const v = p.clone().sub(player.position);
             const d = player.direction;
             const wall_perpen_dist = v.dot(d);
             const strip_height = SCREEN_HEIGHT / wall_perpen_dist;
@@ -445,7 +453,7 @@ function renderWallOffscreenCanvas(offCtx: OffscreenCanvasRenderingContext2D, sc
                     Math.floor(x), Math.floor((SCREEN_HEIGHT - strip_height)*0.5),
                     1, Math.ceil(strip_height));
             } else if (cell instanceof HTMLImageElement) {
-                const t: Vector = p.sub(cell_pos);
+                const t: Vector = p.clone().sub(cell_pos);
                 let tx: number = 0;
                 if ((Math.abs(t.x) < EPS || Math.abs(t.x - 1) < EPS) && t.y > 0) {
                     tx = t.y;
@@ -585,11 +593,11 @@ function renderFrame(off_ctx: OffscreenCanvasRenderingContext2D,
 
         const td = player.direction.rotate(angular_velocity);
         const movement = player.direction.scale(velocity);
-        const x_move = player.position.add(new Vector(movement.x, 0));
+        const x_move = player.position.clone().add(new Vector(movement.x, 0));
         if (canGoThere(scene, x_move)) {
             player.position = x_move;
         }
-        const y_move = player.position.add(new Vector(0, movement.y));
+        const y_move = player.position.clone().add(new Vector(0, movement.y));
         if (canGoThere(scene, y_move)) {
             player.position = y_move;
         }
