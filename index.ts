@@ -85,11 +85,15 @@ class Vector {
     }
 
     mul(that: Vector): Vector {
-        return new Vector(this.x * that.x, this.y * that.y);
+        this.x *= that.x;
+        this.y *= that.y;
+        return this;
     }
 
     div(that: Vector): Vector {
-        return new Vector(this.x / that.x, this.y / that.y);
+        this.x /= that.x;
+        this.y /= that.y;
+        return this;
     }
 
     dot(that: Vector): number {
@@ -102,11 +106,15 @@ class Vector {
 
     norm(): Vector {
         const v_len = this.length();
-        return new Vector(this.x/v_len, this.y/v_len);
+        this.x /= v_len;
+        this.y /= v_len;
+        return this;
     }
 
-    scale(factor: number): Vector { 
-        return new Vector(this.x*factor, this.y*factor);
+    scale(factor: number): Vector {
+        this.x *= factor;
+        this.y *= factor;
+        return this;
     }
 
     distanceTo(that: Vector): number {
@@ -116,7 +124,9 @@ class Vector {
     rotate(rad: number): Vector {
         const theta: number = Math.atan2(this.y, this.x) + rad;
         const r: number = this.length();
-        return new Vector(r*Math.cos(theta), r*Math.sin(theta));
+        this.x = r*Math.cos(theta);
+        this.y = r*Math.sin(theta);
+        return this;
     }
 
     clone(): Vector {
@@ -124,7 +134,10 @@ class Vector {
     }
 
     rot90(): Vector {
-        return new Vector(-this.y, this.x)
+        const tmpX = this.x;
+        this.x = -this.y;
+        this.y = tmpX;
+        return this;
     }
 
     lerp(that: Vector, factor: number): Vector {
@@ -144,8 +157,8 @@ class Player {
     // fovRange return two vector from player position to the two sides of NEAR_CLIPPING_PLANE
     fovRange():[Vector, Vector] {
         const ray_len: number = NEAR_CLIPPING_PLANE / Math.cos(FOV/2);
-        const p1: Vector = this.direction.rotate(-1 * FOV/2).scale(ray_len);
-        const p2: Vector = this.direction.rotate(FOV/2).scale(ray_len);
+        const p1: Vector = this.direction.clone().rotate(-1 * FOV/2).scale(ray_len);
+        const p2: Vector = this.direction.clone().rotate(FOV/2).scale(ray_len);
         return [p1, p2];
     }
 }
@@ -297,10 +310,10 @@ function renderMinimapOffscreen(offCtx: OffscreenCanvasRenderingContext2D, scene
     offCtx.strokeStyle = "magenta";
 
     offCtx.beginPath()
-    const top = player.position.clone().add(player.direction.scale(PLAYER_SIZE/2));
-    const tp = player.position.clone().sub(player.direction.scale(PLAYER_SIZE/2));
-    const bottom_left = tp.clone().add(player.direction.scale(PLAYER_SIZE/2).rot90());
-    const bottom_right = tp.clone().sub(player.direction.scale(PLAYER_SIZE/2).rot90());
+    const top = player.position.clone().add(player.direction.clone().scale(PLAYER_SIZE/2));
+    const tp = player.position.clone().sub(player.direction.clone().scale(PLAYER_SIZE/2));
+    const bottom_left = tp.clone().add(player.direction.clone().scale(PLAYER_SIZE/2).rot90());
+    const bottom_right = tp.clone().sub(player.direction.clone().scale(PLAYER_SIZE/2).rot90());
 
     offCtx.moveTo(top.x, top.y);
     offCtx.lineTo(bottom_left.x, bottom_left.y);
@@ -340,8 +353,8 @@ function renderCeilingImageData(offImageData: ImageData, scene: Scene, player: P
     for (let y = SCREEN_HEIGHT / 2 - 1; y >= 0; y--) {
         const z = y;
         const actual_len = ray_len / (player_height - z) / NEAR_CLIPPING_PLANE * player_height;
-        const extended_r1: Vector = r1.norm().scale(actual_len)
-        const extended_r2: Vector = r2.norm().scale(actual_len)
+        const extended_r1: Vector = r1.clone().norm().scale(actual_len)
+        const extended_r2: Vector = r2.clone().norm().scale(actual_len)
         for (let x = 0; x <= SCREEN_WIDTH; x++) {
             const t: Vector = extended_r1.lerp(extended_r2, x/SCREEN_WIDTH).clone().add(player.position);
             const color = scene.getCeiling(t.x, t.y);
@@ -366,8 +379,8 @@ function renderFloorImageData(offImageData: ImageData, scene: Scene, player: Pla
     for (let y = SCREEN_HEIGHT/2; y < SCREEN_HEIGHT; y++) {
         const z = (SCREEN_HEIGHT - y);
         const actual_len = ray_len / (player_height - z) / NEAR_CLIPPING_PLANE * player_height;
-        const extended_r1: Vector = r1.norm().scale(actual_len)
-        const extended_r2: Vector = r2.norm().scale(actual_len)
+        const extended_r1: Vector = r1.clone().norm().scale(actual_len)
+        const extended_r2: Vector = r2.clone().norm().scale(actual_len)
         for (let x = 0; x <= SCREEN_WIDTH; x++) {
             const t: Vector = extended_r1.lerp(extended_r2, x/SCREEN_WIDTH).clone().add(player.position);
             const color = scene.getFloor(t.x, t.y);
@@ -406,7 +419,6 @@ function renderWallImageData(offImageData: ImageData, scene: Scene, player: Play
                     imageData[(offImageData.width * dy + dx) * 4 + 1] = Math.floor(renderColor.g * 255)
                     imageData[(offImageData.width * dy + dx) * 4 + 2] = Math.floor(renderColor.b * 255)
                     imageData[(offImageData.width * dy + dx) * 4 + 3] = Math.floor(renderColor.a * 255)
-                    
                 }
             } else if (cell instanceof ImageData) {
                 const t: Vector = p.clone().sub(cell_pos);
@@ -591,8 +603,8 @@ function renderFrame(off_ctx: OffscreenCanvasRenderingContext2D,
             angular_velocity += PLAYER_ANGULAR_SPEED * delta_time;
         }
 
-        const td = player.direction.rotate(angular_velocity);
-        const movement = player.direction.scale(velocity);
+        const td = player.direction.clone().rotate(angular_velocity);
+        const movement = player.direction.clone().scale(velocity);
         const x_move = player.position.clone().add(new Vector(movement.x, 0));
         if (canGoThere(scene, x_move)) {
             player.position = x_move;
