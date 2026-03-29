@@ -133,6 +133,12 @@ class Vector {
         return new Vector(this.x, this.y);
     }
 
+    copy(that: Vector): Vector {
+        this.x = that.x;
+        this.y = that.y;
+        return this;
+    }
+
     rot90(): Vector {
         const tmpX = this.x;
         this.x = -this.y;
